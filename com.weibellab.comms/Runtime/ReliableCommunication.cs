@@ -58,6 +58,8 @@ namespace Comms
         {
         }
 
+        public System.Action<NetworkStream> messageParser;
+
         #region public members
         // Determining type of socket communication
         public bool isServer;
@@ -161,6 +163,9 @@ namespace Comms
         /// </summary>
         private void Awake()
         {
+            // Set Message Parser
+            if (this.messageParser is null) this.messageParser = this.DefaultMessageParser;
+
             if (Host.Name.Length == 0)
                 Host.Name = this.gameObject.name;
 
@@ -850,6 +855,55 @@ namespace Comms
             }
         }
 
+
+
+        private void DefaultMessageParser(NetworkStream stream)
+        {
+
+            if (dynamicMessageLength)
+            {
+                byte[] lengthHeader = new byte[8];
+                while (!killThreadRequested)
+                {
+                    // Debug.Log("Inside");
+                    // reads 4 bytes - header
+                    readToBuffer(stream, lengthHeader, lengthHeader.Length);
+
+                    // convert to int (UInt32LE)
+                    Int32 imgHeight = BitConverter.ToInt32(lengthHeader, 0);
+                    Int32 imgWidth = BitConverter.ToInt32(lengthHeader, 4);
+                    // Debug.Log(imgHeight + "x" + imgWidth);
+                    // create appropriately sized byte array for message
+                    byte[] bytes = new byte[imgHeight * imgWidth * 3];
+
+                    // create appropriately sized byte array for message
+                    bytes = new byte[imgHeight * imgWidth * 3];
+                    readToBuffer(stream, bytes, bytes.Length);
+                    
+                    lock (messageQueueLock)
+                    {
+                        messageQueue.Enqueue(bytes);
+                    }
+                }
+
+            }
+            else
+            {
+                while (!killThreadRequested)
+                {
+                    // create appropriately sized byte array for message
+                    byte[] bytes = new byte[fixedMessageLength];
+
+                    readToBuffer(stream, bytes, bytes.Length);
+                    
+                    lock (messageQueueLock)
+                    {
+                        messageQueue.Enqueue(bytes);
+                    }
+                }
+            }
+        }
+
         private void SocketMessageReadingLoop(TcpClient tcpClientSocket, bool incoming = false)
         {
             using (NetworkStream stream = tcpClientSocket.GetStream())
@@ -857,49 +911,7 @@ namespace Comms
                 statisticsReporter.RecordConnectionEstablished();
                 try
                 {
-
-                    if (dynamicMessageLength)
-                    {
-                        byte[] lengthHeader = new byte[4];
-                        while (!killThreadRequested)
-                        {
-                            // reads 4 bytes - header
-                            readToBuffer(stream, lengthHeader, lengthHeader.Length);
-
-                            // convert to int (UInt32LE)
-                            UInt32 msgLength = BitConverter.ToUInt32(lengthHeader, 0);
-
-                            // create appropriately sized byte array for message
-                            byte[] bytes = new byte[msgLength];
-
-                            // create appropriately sized byte array for message
-                            bytes = new byte[msgLength];
-                            readToBuffer(stream, bytes, bytes.Length);
-
-                            statisticsReporter.RecordMessageReceived();
-                            lock (messageQueueLock)
-                            {
-                                messageQueue.Enqueue(bytes);
-                            }
-                        }
-
-                    }
-                    else
-                    {
-                        while (!killThreadRequested)
-                        {
-                            // create appropriately sized byte array for message
-                            byte[] bytes = new byte[fixedMessageLength];
-
-                            readToBuffer(stream, bytes, bytes.Length);
-
-                            statisticsReporter.RecordMessageReceived();
-                            lock (messageQueueLock)
-                            {
-                                messageQueue.Enqueue(bytes);
-                            }
-                        }
-                    }
+                    this.messageParser.Invoke(stream);
                 }
                 catch (System.IO.IOException ioException)
                 {
@@ -907,6 +919,7 @@ namespace Comms
                     // let's expose that exception and handle it below
                     throw ioException.InnerException;
                 }
+                statisticsReporter.RecordMessageReceived();
             }
         }
 
@@ -923,6 +936,7 @@ namespace Comms
             while (offset < buffer.Length)
             {
                 int bytesRead = stream.Read(buffer, offset, readLength - offset); // read from stream
+                
                 statisticsReporter.RecordPacketReceived(bytesRead);
 
                 // "  If the remote host shuts down the connection, and all available data has been received,
