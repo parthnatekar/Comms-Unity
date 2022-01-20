@@ -860,22 +860,24 @@ namespace Comms
 
                     if (dynamicMessageLength)
                     {
-                        byte[] lengthHeader = new byte[4];
+                        byte[] lengthHeader = new byte[8];
                         while (!killThreadRequested)
                         {
+                            // Debug.Log("Inside");
                             // reads 4 bytes - header
                             readToBuffer(stream, lengthHeader, lengthHeader.Length);
 
                             // convert to int (UInt32LE)
-                            UInt32 msgLength = BitConverter.ToUInt32(lengthHeader, 0);
+                            Int32 imgHeight = BitConverter.ToInt32(lengthHeader, 0);
+                            Int32 imgWidth = BitConverter.ToInt32(lengthHeader, 4);
+                            // Debug.Log(imgHeight + "x" + imgWidth);
+                            // create appropriately sized byte array for message
+                            byte[] bytes = new byte[imgHeight*imgWidth*3];
 
                             // create appropriately sized byte array for message
-                            byte[] bytes = new byte[msgLength];
-
-                            // create appropriately sized byte array for message
-                            bytes = new byte[msgLength];
+                            bytes = new byte[imgHeight*imgWidth*3];
                             readToBuffer(stream, bytes, bytes.Length);
-
+                            
                             statisticsReporter.RecordMessageReceived();
                             lock (messageQueueLock)
                             {
@@ -923,6 +925,7 @@ namespace Comms
             while (offset < buffer.Length)
             {
                 int bytesRead = stream.Read(buffer, offset, readLength - offset); // read from stream
+                
                 statisticsReporter.RecordPacketReceived(bytesRead);
 
                 // "  If the remote host shuts down the connection, and all available data has been received,
