@@ -88,6 +88,7 @@ namespace Comms
         // message headers
         public bool dynamicMessageLength;
         public int fixedMessageLength = 1024;
+        public int fixedSendLength = 145;
 
         // dropping packets?
         [Tooltip("Data events will be called only with the last message received. Use wisely")]
@@ -596,10 +597,10 @@ namespace Comms
             }
             else
             {
-                bytesToSend = new byte[fixedMessageLength];
-                if (msg.Length > fixedMessageLength)
+                bytesToSend = new byte[fixedSendLength];
+                if (msg.Length > fixedSendLength)
                 {
-                    Debug.LogError(string.Format("{0}Message is too large! (Expected {1}, received {2} bytes)", LogName, fixedMessageLength, msg.Length));
+                    Debug.LogError(string.Format("{0}Message is too large! (Expected {1}, received {2} bytes)", LogName, fixedSendLength, msg.Length));
                 }
                 else
                 {
