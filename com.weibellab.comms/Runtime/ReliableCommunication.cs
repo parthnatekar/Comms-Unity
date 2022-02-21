@@ -88,7 +88,7 @@ namespace Comms
         // message headers
         public bool dynamicMessageLength;
         public int fixedMessageLength = 1024;
-        public int fixedSendLength = 145;
+        public int fixedSendLength = 461;
 
         // dropping packets?
         [Tooltip("Data events will be called only with the last message received. Use wisely")]
